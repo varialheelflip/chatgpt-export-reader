@@ -231,7 +231,8 @@ body {
 }
 
 .message-card.user {
-  width: 40%;
+  width: fit-content;
+  max-width: 40%;
   align-self: flex-end;
   background: #e0ecff;
   display: flex;
