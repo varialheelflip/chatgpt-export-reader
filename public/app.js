@@ -20,6 +20,58 @@ function roleLabel(role) {
   return role;
 }
 
+function escapeHtml(input) {
+  return input
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function renderMarkdown(markdown) {
+  if (!markdown) return '';
+
+  let html = escapeHtml(markdown);
+
+  html = html.replace(/```([\w-]*)\n([\s\S]*?)```/g, (_m, lang, code) => {
+    const langClass = lang ? ` class="lang-${lang}"` : '';
+    return `<pre><code${langClass}>${code.trimEnd()}</code></pre>`;
+  });
+
+  html = html
+    .replace(/^###\s+(.+)$/gm, '<h3>$1</h3>')
+    .replace(/^##\s+(.+)$/gm, '<h2>$1</h2>')
+    .replace(/^#\s+(.+)$/gm, '<h1>$1</h1>')
+    .replace(/^>\s+(.+)$/gm, '<blockquote>$1</blockquote>');
+
+  html = html
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+
+  html = html.replace(/(?:^|\n)([-*])\s+(.+)(?=\n|$)/g, (match, _marker, item, offset, source) => {
+    const prev = source.slice(0, offset);
+    const openList = prev.endsWith('</li>') ? '' : '<ul>';
+    return `${openList}<li>${item}</li>`;
+  });
+
+  html = html.replace(/(<li>.*?<\/li>)(?!\s*<li>)/gs, '$1</ul>');
+
+  html = html
+    .split(/\n{2,}/)
+    .map((block) => {
+      const trimmed = block.trim();
+      if (!trimmed) return '';
+      if (/^<(h\d|ul|pre|blockquote)/.test(trimmed)) return trimmed;
+      return `<p>${trimmed.replace(/\n/g, '<br>')}</p>`;
+    })
+    .join('');
+
+  return html;
+}
+
 async function fetchList() {
   const res = await fetch('/api/conversations');
   const data = await res.json();
@@ -115,7 +167,7 @@ function renderConversation() {
 
     card.classList.add(node.role);
     meta.textContent = `${roleLabel(node.role)} · ${fmtTime(node.createTime)}`;
-    content.textContent = node.text;
+    content.innerHTML = renderMarkdown(node.text);
 
     if (node.branchChildren.length > 1) {
       const select = document.createElement('select');
