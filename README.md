@@ -42,6 +42,21 @@ npm start
 
 - `http://localhost:3000`
 
+## Windows 一键启动
+
+在 Windows 上可以直接双击或在终端里运行：
+
+```bat
+start-windows.cmd
+```
+
+这个脚本会：
+
+- 启动本地服务
+- 打开一个专用命令行窗口运行服务
+- 按 `Ctrl+C` 或直接关闭窗口时停止服务
+- 不会自动打开浏览器
+
 ## 使用方式
 
 1. 启动服务后打开 `http://localhost:3000`
