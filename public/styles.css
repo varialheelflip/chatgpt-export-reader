@@ -43,15 +43,8 @@ body {
 }
 
 .sidebar h1 {
-  margin: 0;
+  margin: 0 0 16px;
   font-size: 20px;
-}
-
-.tip {
-  color: var(--muted);
-  margin: 8px 0 16px;
-  font-size: 13px;
-  line-height: 1.5;
 }
 
 .directory-form {
@@ -64,6 +57,58 @@ body {
 .field-label {
   font-size: 13px;
   font-weight: 600;
+}
+
+.field-label-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tooltip-trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: help;
+  outline: none;
+  flex: 0 0 auto;
+}
+
+.tooltip-bubble {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 10;
+  width: 260px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.2);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s ease;
+  pointer-events: none;
+}
+
+.tooltip-trigger:hover .tooltip-bubble,
+.tooltip-trigger:focus-visible .tooltip-bubble {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
 }
 
 .directory-input,
@@ -150,12 +195,6 @@ body {
   font-weight: 600;
 }
 
-.conversation-item .time {
-  margin-top: 4px;
-  color: var(--muted);
-  font-size: 12px;
-}
-
 .chat-panel {
   display: flex;
   flex-direction: column;
@@ -237,6 +276,12 @@ body {
 
   .directory-actions {
     flex-direction: column;
+  }
+
+  .tooltip-bubble {
+    right: auto;
+    left: 0;
+    width: min(260px, calc(100vw - 64px));
   }
 }
 

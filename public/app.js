@@ -15,11 +15,6 @@ const saveDirectoryBtnEl = document.getElementById('save-directory-btn');
 const clearDirectoryBtnEl = document.getElementById('clear-directory-btn');
 const directoryStatusEl = document.getElementById('directory-status');
 
-function fmtTime(ts) {
-  if (!ts) return '未知时间';
-  return new Date(ts * 1000).toLocaleString('zh-CN');
-}
-
 function roleLabel(role) {
   if (role === 'user') return '用户';
   if (role === 'assistant') return '助手';
@@ -156,11 +151,7 @@ function renderList() {
     const btn = document.createElement('button');
     btn.className = 'conversation-item';
     if (state.current?.id === convo.id) btn.classList.add('active');
-
-    btn.innerHTML = `
-      <div class="title">${convo.title}</div>
-      <div class="time">更新：${fmtTime(convo.updateTime)}</div>
-    `;
+    btn.innerHTML = `<div class="title">${convo.title}</div>`;
 
     btn.addEventListener('click', async () => {
       try {
@@ -239,7 +230,7 @@ function renderConversation() {
     const switcher = frag.querySelector('.branch-switcher');
 
     card.classList.add(node.role);
-    meta.textContent = `${roleLabel(node.role)} | ${fmtTime(node.createTime)}`;
+    meta.textContent = roleLabel(node.role);
     content.innerHTML = renderMarkdown(node.text);
 
     if (node.branchChildren.length > 1) {
