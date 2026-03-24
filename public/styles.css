@@ -261,7 +261,7 @@ body {
   right: 0;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 2px;
   margin-top: 0;
 }
 
@@ -290,7 +290,7 @@ body {
 }
 
 .branch-index {
-  min-width: 36px;
+  min-width: 30px;
   color: var(--muted);
   font-size: 12px;
   text-align: center;

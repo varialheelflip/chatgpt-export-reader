@@ -214,7 +214,7 @@ function renderBranchSwitcher(parentNodeId, branchChildren, switcher) {
   const prevBtn = document.createElement('button');
   prevBtn.type = 'button';
   prevBtn.className = 'branch-nav-btn';
-  prevBtn.innerHTML = '&larr;';
+  prevBtn.textContent = '<';
   prevBtn.disabled = currentIndex <= 0;
   prevBtn.addEventListener('click', () => {
     if (currentIndex <= 0) return;
@@ -229,7 +229,7 @@ function renderBranchSwitcher(parentNodeId, branchChildren, switcher) {
   const nextBtn = document.createElement('button');
   nextBtn.type = 'button';
   nextBtn.className = 'branch-nav-btn';
-  nextBtn.innerHTML = '&rarr;';
+  nextBtn.textContent = '>';
   nextBtn.disabled = currentIndex >= branchChildren.length - 1;
   nextBtn.addEventListener('click', () => {
     if (currentIndex >= branchChildren.length - 1) return;
