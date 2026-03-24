@@ -45,7 +45,10 @@ function renderMarkdown(markdown) {
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    .replace(
+      /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+      '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+    );
 
   html = html.replace(/(?:^|\n)([-*])\s+(.+)(?=\n|$)/g, (_match, _marker, item, offset, source) => {
     const prev = source.slice(0, offset);
@@ -79,7 +82,7 @@ function setDirectoryFormDisabled(disabled) {
   clearDirectoryBtnEl.disabled = disabled;
 }
 
-function resetConversationView(title, message) {
+function resetConversationView(message) {
   state.current = null;
   state.selectedByParent = {};
   messagesEl.innerHTML = `<div class="empty">${message}</div>`;
@@ -115,7 +118,7 @@ async function fetchList() {
   renderList();
 
   if (!data.configured) {
-    resetConversationView('未配置 JSON 文件夹', '请先输入要读取的文件夹路径。');
+    resetConversationView('请先输入要读取的文件夹路径。');
     return;
   }
 
@@ -125,7 +128,7 @@ async function fetchList() {
     return;
   }
 
-  resetConversationView('当前文件夹没有 JSON 文件', `已加载文件夹：${data.dataDir}`);
+  resetConversationView(`已加载文件夹：${data.dataDir}`);
 }
 
 function renderList() {
@@ -202,6 +205,41 @@ function buildPath() {
   return pathList;
 }
 
+function renderBranchSwitcher(parentNodeId, branchChildren, switcher) {
+  const currentBranchId = branchChildren.includes(state.selectedByParent[parentNodeId])
+    ? state.selectedByParent[parentNodeId]
+    : branchChildren[0];
+  const currentIndex = branchChildren.indexOf(currentBranchId);
+
+  const prevBtn = document.createElement('button');
+  prevBtn.type = 'button';
+  prevBtn.className = 'branch-nav-btn';
+  prevBtn.innerHTML = '&larr;';
+  prevBtn.disabled = currentIndex <= 0;
+  prevBtn.addEventListener('click', () => {
+    if (currentIndex <= 0) return;
+    state.selectedByParent[parentNodeId] = branchChildren[currentIndex - 1];
+    renderConversation();
+  });
+
+  const indexEl = document.createElement('span');
+  indexEl.className = 'branch-index';
+  indexEl.textContent = `${currentIndex + 1}/${branchChildren.length}`;
+
+  const nextBtn = document.createElement('button');
+  nextBtn.type = 'button';
+  nextBtn.className = 'branch-nav-btn';
+  nextBtn.innerHTML = '&rarr;';
+  nextBtn.disabled = currentIndex >= branchChildren.length - 1;
+  nextBtn.addEventListener('click', () => {
+    if (currentIndex >= branchChildren.length - 1) return;
+    state.selectedByParent[parentNodeId] = branchChildren[currentIndex + 1];
+    renderConversation();
+  });
+
+  switcher.append(prevBtn, indexEl, nextBtn);
+}
+
 function renderConversation() {
   messagesEl.innerHTML = '';
 
@@ -223,25 +261,11 @@ function renderConversation() {
     meta.remove();
     content.innerHTML = renderMarkdown(node.text);
 
-    if (node.branchChildren.length > 1) {
-      const select = document.createElement('select');
-      node.branchChildren.forEach((childId, idx) => {
-        const option = document.createElement('option');
-        option.value = childId;
-        option.textContent = `分支 ${idx + 1}/${node.branchChildren.length}`;
-        select.appendChild(option);
-      });
-
-      select.value = state.selectedByParent[node.id] || node.branchChildren[0];
-      select.addEventListener('change', () => {
-        state.selectedByParent[node.id] = select.value;
-        renderConversation();
-      });
-
-      const label = document.createElement('div');
-      label.className = 'message-meta';
-      label.textContent = '切换该节点后的分支：';
-      switcher.append(label, select);
+    const branchParentId = node.parentOptionsFrom;
+    const branchParent = branchParentId ? state.current.nodes[branchParentId] : null;
+    if (branchParent && branchParent.branchChildren.length > 1) {
+      card.classList.add('has-switcher');
+      renderBranchSwitcher(branchParentId, branchParent.branchChildren, switcher);
     }
 
     messagesEl.appendChild(frag);
@@ -301,7 +325,7 @@ clearDirectoryBtnEl.addEventListener('click', async () => {
     state.list = [];
     directoryInputEl.value = '';
     renderList();
-    resetConversationView('未配置 JSON 文件夹', '请重新输入要读取的文件夹路径。');
+    resetConversationView('请重新输入要读取的文件夹路径。');
     setDirectoryStatus('已清空保存的文件夹路径。');
   } catch (error) {
     console.error(error);
@@ -316,7 +340,7 @@ async function init() {
     const directoryState = await fetchDirectoryState();
     if (!directoryState.configured || directoryState.error) {
       renderList();
-      resetConversationView('未配置 JSON 文件夹', '请先输入可读取的文件夹路径。');
+      resetConversationView('请先输入可读取的文件夹路径。');
       return;
     }
 
@@ -325,7 +349,7 @@ async function init() {
     console.error(error);
     setDirectoryStatus(`加载失败：${error.message}`, 'error');
     listEl.innerHTML = `<div class="empty">加载失败：${error.message}</div>`;
-    resetConversationView('加载失败', '请检查服务端日志或重新设置文件夹路径。');
+    resetConversationView('请检查服务端日志或重新设置文件夹路径。');
   }
 }
 

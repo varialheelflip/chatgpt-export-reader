@@ -222,12 +222,17 @@ body {
 }
 
 .message-card {
+  position: relative;
   width: 75%;
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 14px;
   background: var(--assistant);
   align-self: center;
+}
+
+.message-card.has-switcher {
+  padding-top: 48px;
 }
 
 .message-card.user {
@@ -251,14 +256,37 @@ body {
 }
 
 .branch-switcher {
-  margin-top: 10px;
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 0;
 }
 
-.branch-switcher select {
-  padding: 6px 8px;
-  border-radius: 8px;
+.branch-nav-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
   border: 1px solid var(--border);
   background: #fff;
+  color: #1f2937;
+  cursor: pointer;
+  font: inherit;
+  line-height: 1;
+}
+
+.branch-nav-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.branch-index {
+  min-width: 36px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
 }
 
 .empty {
