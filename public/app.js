@@ -6,7 +6,6 @@ const state = {
 };
 
 const listEl = document.getElementById('conversation-list');
-const titleEl = document.getElementById('chat-title');
 const messagesEl = document.getElementById('chat-messages');
 const messageTpl = document.getElementById('message-template');
 const directoryFormEl = document.getElementById('directory-form');
@@ -14,12 +13,6 @@ const directoryInputEl = document.getElementById('directory-input');
 const saveDirectoryBtnEl = document.getElementById('save-directory-btn');
 const clearDirectoryBtnEl = document.getElementById('clear-directory-btn');
 const directoryStatusEl = document.getElementById('directory-status');
-
-function roleLabel(role) {
-  if (role === 'user') return '用户';
-  if (role === 'assistant') return '助手';
-  return role;
-}
 
 function escapeHtml(input) {
   if (typeof input !== 'string') return '';
@@ -89,7 +82,6 @@ function setDirectoryFormDisabled(disabled) {
 function resetConversationView(title, message) {
   state.current = null;
   state.selectedByParent = {};
-  titleEl.textContent = title;
   messagesEl.innerHTML = `<div class="empty">${message}</div>`;
 }
 
@@ -214,12 +206,10 @@ function renderConversation() {
   messagesEl.innerHTML = '';
 
   if (!state.current || !state.current.startId) {
-    titleEl.textContent = '该文件未找到可展示消息';
     messagesEl.innerHTML = '<div class="empty">请尝试其他 JSON 文件</div>';
     return;
   }
 
-  titleEl.textContent = state.current.title;
   const pathList = buildPath();
 
   for (const node of pathList) {
@@ -230,7 +220,7 @@ function renderConversation() {
     const switcher = frag.querySelector('.branch-switcher');
 
     card.classList.add(node.role);
-    meta.textContent = roleLabel(node.role);
+    meta.remove();
     content.innerHTML = renderMarkdown(node.text);
 
     if (node.branchChildren.length > 1) {
