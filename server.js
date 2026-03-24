@@ -4,9 +4,61 @@ const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const DATA_DIR = process.env.DATA_DIR || __dirname;
+const CONFIG_PATH = path.join(__dirname, 'data-directory.json');
 
+let currentDataDir = resolveDataDir(process.env.DATA_DIR) || null;
+
+app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+
+function resolveDataDir(input) {
+  if (typeof input !== 'string') return null;
+
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+
+  return path.isAbsolute(trimmed)
+    ? path.normalize(trimmed)
+    : path.normalize(path.resolve(__dirname, trimmed));
+}
+
+async function readSavedConfig() {
+  try {
+    const raw = await fs.readFile(CONFIG_PATH, 'utf8');
+    const parsed = JSON.parse(raw);
+    return resolveDataDir(parsed.dataDir);
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
+}
+
+async function writeSavedConfig(dataDir) {
+  await fs.writeFile(
+    CONFIG_PATH,
+    `${JSON.stringify({ dataDir }, null, 2)}\n`,
+    'utf8'
+  );
+}
+
+async function assertReadableDirectory(dirPath) {
+  const stats = await fs.stat(dirPath);
+  if (!stats.isDirectory()) {
+    throw new Error('所填路径不是文件夹');
+  }
+
+  await fs.readdir(dirPath);
+}
+
+function buildDirectoryState(errorMessage = null) {
+  return {
+    dataDir: currentDataDir,
+    configured: Boolean(currentDataDir),
+    error: errorMessage
+  };
+}
 
 function getRole(node) {
   return node?.message?.author?.role || 'unknown';
@@ -107,14 +159,47 @@ function normalizeConversation(data, fileName) {
   };
 }
 
-app.get('/api/conversations', async (_req, res) => {
+app.get('/api/data-directory', async (_req, res) => {
+  if (!currentDataDir) {
+    return res.json(buildDirectoryState());
+  }
+
   try {
-    const files = await fs.readdir(DATA_DIR);
+    await assertReadableDirectory(currentDataDir);
+    return res.json(buildDirectoryState());
+  } catch (error) {
+    return res.json(buildDirectoryState(error.message));
+  }
+});
+
+app.post('/api/data-directory', async (req, res) => {
+  const nextDataDir = resolveDataDir(req.body?.dataDir);
+
+  try {
+    if (nextDataDir) {
+      await assertReadableDirectory(nextDataDir);
+    }
+
+    currentDataDir = nextDataDir;
+    await writeSavedConfig(currentDataDir);
+    res.json(buildDirectoryState());
+  } catch (error) {
+    res.status(400).json({ error: '保存文件夹失败', detail: error.message });
+  }
+});
+
+app.get('/api/conversations', async (_req, res) => {
+  if (!currentDataDir) {
+    return res.json({ conversations: [], ...buildDirectoryState() });
+  }
+
+  try {
+    const files = await fs.readdir(currentDataDir);
     const jsonFiles = files.filter((file) => file.toLowerCase().endsWith('.json'));
 
     const summaries = [];
     for (const file of jsonFiles) {
-      const fullPath = path.join(DATA_DIR, file);
+      const fullPath = path.join(currentDataDir, file);
       try {
         const raw = await fs.readFile(fullPath, 'utf8');
         const parsed = JSON.parse(raw);
@@ -125,25 +210,30 @@ app.get('/api/conversations', async (_req, res) => {
           updateTime: parsed.update_time || null
         });
       } catch {
-        // 忽略单个文件解析失败，继续处理其余文件。
+        // 忽略单个文件解析失败，继续处理其他文件。
       }
     }
 
     summaries.sort((a, b) => (b.updateTime || 0) - (a.updateTime || 0));
-    res.json({ conversations: summaries });
+    res.json({ conversations: summaries, ...buildDirectoryState() });
   } catch (error) {
     res.status(500).json({ error: '读取会话列表失败', detail: error.message });
   }
 });
 
 app.get('/api/conversations/:id', async (req, res) => {
+  if (!currentDataDir) {
+    return res.status(400).json({ error: '尚未配置 JSON 文件夹' });
+  }
+
   const fileName = req.params.id;
   if (!fileName.toLowerCase().endsWith('.json')) {
     return res.status(400).json({ error: '仅支持 JSON 文件' });
   }
 
-  const safePath = path.normalize(path.join(DATA_DIR, fileName));
-  if (!safePath.startsWith(path.normalize(DATA_DIR + path.sep))) {
+  const safeBaseDir = path.normalize(`${currentDataDir}${path.sep}`);
+  const safePath = path.normalize(path.join(currentDataDir, fileName));
+  if (!safePath.startsWith(safeBaseDir)) {
     return res.status(400).json({ error: '非法路径' });
   }
 
@@ -157,7 +247,20 @@ app.get('/api/conversations/:id', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Chat Export Reader running at http://localhost:${PORT}`);
-  console.log(`Data directory: ${DATA_DIR}`);
-});
+async function start() {
+  try {
+    const savedDataDir = await readSavedConfig();
+    if (savedDataDir) {
+      currentDataDir = savedDataDir;
+    }
+  } catch (error) {
+    console.error(`Failed to read saved data directory: ${error.message}`);
+  }
+
+  app.listen(PORT, () => {
+    console.log(`Chat Export Reader running at http://localhost:${PORT}`);
+    console.log(`Data directory: ${currentDataDir || '(not configured)'}`);
+  });
+}
+
+start();
