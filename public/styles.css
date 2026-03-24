@@ -35,11 +35,13 @@ body {
 .sidebar {
   display: flex;
   flex-direction: column;
+  position: relative;
+  z-index: 5;
   background: var(--panel);
   border-right: 1px solid var(--border);
   padding: 20px;
   min-height: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .sidebar h1 {
@@ -86,8 +88,8 @@ body {
 .tooltip-bubble {
   position: absolute;
   top: calc(100% + 8px);
-  left: 0;
-  z-index: 1000;
+  left: calc(100% - 8px);
+  z-index: 2000;
   width: 260px;
   padding: 10px 12px;
   border-radius: 10px;
@@ -189,11 +191,11 @@ body {
 }
 
 .conversation-item:hover {
-  background: #f8fafc;
+  background: #eef2ff;
 }
 
 .conversation-item.active {
-  background: #eff6ff;
+  background: #dbeafe;
 }
 
 .conversation-item .title {
@@ -220,7 +222,7 @@ body {
 }
 
 .message-card {
-  max-width: 900px;
+  width: 75%;
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 14px;
@@ -229,8 +231,11 @@ body {
 }
 
 .message-card.user {
+  width: 40%;
   align-self: flex-end;
   background: #e0ecff;
+  display: flex;
+  align-items: center;
 }
 
 .message-meta {
@@ -275,8 +280,14 @@ body {
   }
 
   .tooltip-bubble {
-    left: 0;
+    left: auto;
+    right: 0;
     width: min(260px, calc(100vw - 64px));
+  }
+
+  .message-card,
+  .message-card.user {
+    width: 100%;
   }
 }
 
