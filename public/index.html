@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chat Export Reader</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="sidebar">
+        <h1>会话列表</h1>
+        <p class="tip">读取当前目录中的所有 JSON 文件</p>
+        <div id="conversation-list" class="conversation-list"></div>
+      </aside>
+
+      <main class="chat-panel">
+        <header class="chat-header">
+          <h2 id="chat-title">请选择一个会话</h2>
+        </header>
+        <section id="chat-messages" class="chat-messages"></section>
+      </main>
+    </div>
+
+    <template id="message-template">
+      <article class="message-card">
+        <div class="message-meta"></div>
+        <div class="message-content"></div>
+        <div class="branch-switcher"></div>
+      </article>
+    </template>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "name": "chatgpt-export-reader",
+  "version": "1.0.0",
+  "description": "本地 AI 聊天记录阅读器",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
