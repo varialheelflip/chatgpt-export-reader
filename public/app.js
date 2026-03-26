@@ -4,6 +4,7 @@ const state = {
   selectedByParent: {},
   dataDir: null,
   openMenuId: null,
+  openMenuPosition: null,
   deletingConversationId: null
 };
 
@@ -15,6 +16,13 @@ const directoryInputEl = document.getElementById('directory-input');
 const saveDirectoryBtnEl = document.getElementById('save-directory-btn');
 const clearDirectoryBtnEl = document.getElementById('clear-directory-btn');
 const directoryStatusEl = document.getElementById('directory-status');
+const dialogOverlayEl = document.getElementById('dialog-overlay');
+const dialogTitleEl = document.getElementById('dialog-title');
+const dialogMessageEl = document.getElementById('dialog-message');
+const dialogCancelBtnEl = document.getElementById('dialog-cancel-btn');
+const dialogConfirmBtnEl = document.getElementById('dialog-confirm-btn');
+
+let activeDialog = null;
 
 function escapeHtml(input) {
   if (typeof input !== 'string') return '';
@@ -90,10 +98,72 @@ function resetConversationView(message) {
   messagesEl.innerHTML = `<div class="empty">${message}</div>`;
 }
 
+function getMenuPosition(clientX, clientY) {
+  const margin = 8;
+  const estimatedWidth = 96;
+  const estimatedHeight = 48;
+
+  return {
+    left: Math.max(margin, Math.min(clientX + 8, window.innerWidth - estimatedWidth - margin)),
+    top: Math.max(margin, Math.min(clientY + 8, window.innerHeight - estimatedHeight - margin))
+  };
+}
+
+function closeDialog(result = false) {
+  if (!activeDialog) return;
+
+  const { resolve } = activeDialog;
+  activeDialog = null;
+  dialogOverlayEl.classList.add('hidden');
+  dialogOverlayEl.setAttribute('aria-hidden', 'true');
+  resolve(result);
+}
+
+function showDialog({
+  title = '提示',
+  message = '',
+  confirmText = '确定',
+  cancelText = '取消',
+  showCancel = true
+}) {
+  if (activeDialog) {
+    activeDialog.resolve(false);
+  }
+
+  dialogTitleEl.textContent = title;
+  dialogMessageEl.textContent = message;
+  dialogConfirmBtnEl.textContent = confirmText;
+  dialogCancelBtnEl.textContent = cancelText;
+  dialogCancelBtnEl.hidden = !showCancel;
+  dialogOverlayEl.classList.remove('hidden');
+  dialogOverlayEl.setAttribute('aria-hidden', 'false');
+
+  return new Promise((resolve) => {
+    activeDialog = { resolve };
+    setTimeout(() => {
+      (showCancel ? dialogCancelBtnEl : dialogConfirmBtnEl).focus();
+    }, 0);
+  });
+}
+
+function confirmDialog(message) {
+  return showDialog({ title: '提示', message });
+}
+
+function alertDialog(message) {
+  return showDialog({
+    title: '提示',
+    message,
+    confirmText: '知道了',
+    showCancel: false
+  });
+}
+
 function closeConversationMenu() {
   if (!state.openMenuId) return;
 
   state.openMenuId = null;
+  state.openMenuPosition = null;
   renderList();
 }
 
@@ -101,14 +171,14 @@ async function deleteConversation(convo) {
   if (state.deletingConversationId) return;
 
   state.openMenuId = null;
+  state.openMenuPosition = null;
   renderList();
 
-  const confirmed = window.confirm(`确认将“${convo.title}”移动到系统回收站吗？`);
+  const confirmed = await confirmDialog(`确认将“${convo.title}”移动到系统回收站吗？`);
   if (!confirmed) return;
 
   state.deletingConversationId = convo.id;
   renderList();
-  setDirectoryStatus(`正在删除会话：${convo.title}`);
 
   try {
     const res = await fetch(`/api/conversations/${encodeURIComponent(convo.id)}`, {
@@ -120,11 +190,10 @@ async function deleteConversation(convo) {
       throw new Error(data.detail || data.error || '删除会话失败');
     }
 
-    setDirectoryStatus(`已将会话移到系统回收站：${convo.title}`, 'success');
     await fetchList();
   } catch (error) {
     console.error(error);
-    setDirectoryStatus(`删除失败：${error.message}`, 'error');
+    await alertDialog(`删除失败：${error.message}`);
     renderList();
   } finally {
     state.deletingConversationId = null;
@@ -161,6 +230,7 @@ async function fetchList() {
   state.list = data.conversations || [];
   if (!state.list.some((item) => item.id === state.openMenuId)) {
     state.openMenuId = null;
+    state.openMenuPosition = null;
   }
   renderList();
 
@@ -222,7 +292,9 @@ function renderList() {
     menuTrigger.innerHTML = '<span></span><span></span><span></span>';
     menuTrigger.addEventListener('click', (event) => {
       event.stopPropagation();
+      const nextOpen = state.openMenuId !== convo.id;
       state.openMenuId = state.openMenuId === convo.id ? null : convo.id;
+      state.openMenuPosition = nextOpen ? getMenuPosition(event.clientX, event.clientY) : null;
       renderList();
     });
 
@@ -231,6 +303,10 @@ function renderList() {
     if (state.openMenuId === convo.id) {
       const menu = document.createElement('div');
       menu.className = 'conversation-menu';
+      if (state.openMenuPosition) {
+        menu.style.left = `${state.openMenuPosition.left}px`;
+        menu.style.top = `${state.openMenuPosition.top}px`;
+      }
 
       const deleteBtn = document.createElement('button');
       deleteBtn.type = 'button';
@@ -262,6 +338,7 @@ async function openConversation(id) {
   state.current = data;
   state.selectedByParent = {};
   state.openMenuId = null;
+  state.openMenuPosition = null;
   renderList();
   renderConversation();
 }
@@ -415,6 +492,7 @@ clearDirectoryBtnEl.addEventListener('click', async () => {
     state.dataDir = null;
     state.list = [];
     state.openMenuId = null;
+    state.openMenuPosition = null;
     state.deletingConversationId = null;
     directoryInputEl.value = '';
     renderList();
@@ -432,8 +510,35 @@ document.addEventListener('click', () => {
   closeConversationMenu();
 });
 
+window.addEventListener('resize', () => {
+  closeConversationMenu();
+});
+
+listEl.addEventListener('scroll', () => {
+  closeConversationMenu();
+});
+
+dialogOverlayEl.addEventListener('click', (event) => {
+  if (event.target === dialogOverlayEl) {
+    closeDialog(false);
+  }
+});
+
+dialogCancelBtnEl.addEventListener('click', () => {
+  closeDialog(false);
+});
+
+dialogConfirmBtnEl.addEventListener('click', () => {
+  closeDialog(true);
+});
+
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') {
+    if (activeDialog) {
+      closeDialog(false);
+      return;
+    }
+
     closeConversationMenu();
   }
 });

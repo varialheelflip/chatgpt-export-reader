@@ -236,16 +236,16 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  width: 32px;
-  height: 32px;
+  gap: 3px;
+  width: 26px;
+  height: 26px;
   border: none;
   border-radius: 8px;
   background: transparent;
   cursor: pointer;
   opacity: 0;
   pointer-events: none;
-  transition: background-color 0.16s ease, opacity 0.16s ease;
+  transition: opacity 0.16s ease;
 }
 
 .conversation-item:hover .conversation-menu-trigger,
@@ -255,28 +255,29 @@ body {
   pointer-events: auto;
 }
 
-.conversation-menu-trigger:hover:not(:disabled) {
-  background: rgba(37, 99, 235, 0.12);
-}
-
 .conversation-menu-trigger:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
 .conversation-menu-trigger span {
-  width: 4px;
-  height: 4px;
+  width: 3px;
+  height: 3px;
   border-radius: 999px;
+  background: #cbd5e1;
+  transition: background-color 0.16s ease;
+}
+
+.conversation-menu-trigger:hover span,
+.conversation-item.menu-open .conversation-menu-trigger span {
   background: #475569;
 }
 
 .conversation-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  min-width: 108px;
-  padding: 6px;
+  position: fixed;
+  width: max-content;
+  min-width: 0;
+  padding: 4px;
   border: 1px solid rgba(148, 163, 184, 0.28);
   border-radius: 10px;
   background: #fff;
@@ -285,16 +286,17 @@ body {
 }
 
 .conversation-menu-item {
-  width: 100%;
+  width: auto;
   min-height: 34px;
   border: none;
   border-radius: 8px;
   background: transparent;
   text-align: left;
-  padding: 0 10px;
+  padding: 0 12px;
   cursor: pointer;
   font: inherit;
   color: inherit;
+  white-space: nowrap;
 }
 
 .conversation-menu-item:hover:not(:disabled) {
@@ -312,6 +314,64 @@ body {
 
 .conversation-item.deleting {
   opacity: 0.7;
+}
+
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.28);
+  z-index: 100;
+}
+
+.dialog-overlay.hidden {
+  display: none;
+}
+
+.dialog-card {
+  width: min(360px, 100%);
+  padding: 18px 18px 16px;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
+}
+
+.dialog-title {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.dialog-message {
+  margin-top: 10px;
+  color: var(--text);
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.dialog-actions button {
+  min-width: 72px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.dialog-actions button:not(.secondary) {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
 }
 
 .chat-panel {
