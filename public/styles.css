@@ -142,6 +142,7 @@ body {
   padding: 0 12px;
   cursor: pointer;
   background: #fff;
+  transition: background-color 0.16s ease, border-color 0.16s ease;
 }
 
 .directory-actions button[type='submit'] {
@@ -150,8 +151,17 @@ body {
   color: #fff;
 }
 
+.directory-actions button[type='submit']:hover:not(:disabled) {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
 .directory-actions .secondary {
   background: #f8fafc;
+}
+
+.directory-actions .secondary:hover:not(:disabled) {
+  background: #e5e7eb;
 }
 
 .directory-status {
@@ -264,7 +274,7 @@ body {
   width: 3px;
   height: 3px;
   border-radius: 999px;
-  background: #cbd5e1;
+  background: #94a3b8;
   transition: background-color 0.16s ease;
 }
 
@@ -303,6 +313,10 @@ body {
   background: #f8fafc;
 }
 
+.conversation-menu-item.danger:hover:not(:disabled) {
+  background: #fee2e2;
+}
+
 .conversation-menu-item:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -337,6 +351,7 @@ body {
   border-radius: 14px;
   background: #fff;
   box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
+  transform: translateY(-75px);
 }
 
 .dialog-title {
@@ -366,12 +381,22 @@ body {
   background: #fff;
   font: inherit;
   cursor: pointer;
+  transition: background-color 0.16s ease, border-color 0.16s ease;
 }
 
 .dialog-actions button:not(.secondary) {
   border-color: var(--primary);
   background: var(--primary);
   color: #fff;
+}
+
+.dialog-actions button.secondary:hover:not(:disabled) {
+  background: #e5e7eb;
+}
+
+.dialog-actions button:not(.secondary):hover:not(:disabled) {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
 }
 
 .chat-panel {
