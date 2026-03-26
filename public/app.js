@@ -2,7 +2,9 @@ const state = {
   list: [],
   current: null,
   selectedByParent: {},
-  dataDir: null
+  dataDir: null,
+  openMenuId: null,
+  deletingConversationId: null
 };
 
 const listEl = document.getElementById('conversation-list');
@@ -88,6 +90,48 @@ function resetConversationView(message) {
   messagesEl.innerHTML = `<div class="empty">${message}</div>`;
 }
 
+function closeConversationMenu() {
+  if (!state.openMenuId) return;
+
+  state.openMenuId = null;
+  renderList();
+}
+
+async function deleteConversation(convo) {
+  if (state.deletingConversationId) return;
+
+  state.openMenuId = null;
+  renderList();
+
+  const confirmed = window.confirm(`确认将“${convo.title}”移动到系统回收站吗？`);
+  if (!confirmed) return;
+
+  state.deletingConversationId = convo.id;
+  renderList();
+  setDirectoryStatus(`正在删除会话：${convo.title}`);
+
+  try {
+    const res = await fetch(`/api/conversations/${encodeURIComponent(convo.id)}`, {
+      method: 'DELETE'
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.detail || data.error || '删除会话失败');
+    }
+
+    setDirectoryStatus(`已将会话移到系统回收站：${convo.title}`, 'success');
+    await fetchList();
+  } catch (error) {
+    console.error(error);
+    setDirectoryStatus(`删除失败：${error.message}`, 'error');
+    renderList();
+  } finally {
+    state.deletingConversationId = null;
+    renderList();
+  }
+}
+
 async function fetchDirectoryState() {
   const res = await fetch('/api/data-directory');
   const data = await res.json();
@@ -115,6 +159,9 @@ async function fetchList() {
 
   state.dataDir = data.dataDir || null;
   state.list = data.conversations || [];
+  if (!state.list.some((item) => item.id === state.openMenuId)) {
+    state.openMenuId = null;
+  }
   renderList();
 
   if (!data.configured) {
@@ -143,12 +190,18 @@ function renderList() {
   }
 
   for (const convo of state.list) {
-    const btn = document.createElement('button');
-    btn.className = 'conversation-item';
-    if (state.current?.id === convo.id) btn.classList.add('active');
-    btn.innerHTML = `<div class="title">${convo.title}</div>`;
+    const item = document.createElement('div');
+    item.className = 'conversation-item';
+    if (state.current?.id === convo.id) item.classList.add('active');
+    if (state.openMenuId === convo.id) item.classList.add('menu-open');
+    if (state.deletingConversationId === convo.id) item.classList.add('deleting');
 
-    btn.addEventListener('click', async () => {
+    const mainBtn = document.createElement('button');
+    mainBtn.type = 'button';
+    mainBtn.className = 'conversation-main';
+    mainBtn.innerHTML = `<div class="title">${escapeHtml(convo.title)}</div>`;
+
+    mainBtn.addEventListener('click', async () => {
       try {
         await openConversation(convo.id);
       } catch (error) {
@@ -157,7 +210,44 @@ function renderList() {
       }
     });
 
-    listEl.appendChild(btn);
+    const actions = document.createElement('div');
+    actions.className = 'conversation-actions';
+
+    const menuTrigger = document.createElement('button');
+    menuTrigger.type = 'button';
+    menuTrigger.className = 'conversation-menu-trigger';
+    menuTrigger.setAttribute('aria-label', `更多操作：${convo.title}`);
+    menuTrigger.setAttribute('aria-expanded', state.openMenuId === convo.id ? 'true' : 'false');
+    menuTrigger.disabled = state.deletingConversationId === convo.id;
+    menuTrigger.innerHTML = '<span></span><span></span><span></span>';
+    menuTrigger.addEventListener('click', (event) => {
+      event.stopPropagation();
+      state.openMenuId = state.openMenuId === convo.id ? null : convo.id;
+      renderList();
+    });
+
+    actions.appendChild(menuTrigger);
+
+    if (state.openMenuId === convo.id) {
+      const menu = document.createElement('div');
+      menu.className = 'conversation-menu';
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.type = 'button';
+      deleteBtn.className = 'conversation-menu-item danger';
+      deleteBtn.textContent = state.deletingConversationId === convo.id ? '删除中...' : '删除';
+      deleteBtn.disabled = state.deletingConversationId === convo.id;
+      deleteBtn.addEventListener('click', async (event) => {
+        event.stopPropagation();
+        await deleteConversation(convo);
+      });
+
+      menu.appendChild(deleteBtn);
+      actions.appendChild(menu);
+    }
+
+    item.append(mainBtn, actions);
+    listEl.appendChild(item);
   }
 }
 
@@ -171,6 +261,7 @@ async function openConversation(id) {
 
   state.current = data;
   state.selectedByParent = {};
+  state.openMenuId = null;
   renderList();
   renderConversation();
 }
@@ -323,6 +414,8 @@ clearDirectoryBtnEl.addEventListener('click', async () => {
 
     state.dataDir = null;
     state.list = [];
+    state.openMenuId = null;
+    state.deletingConversationId = null;
     directoryInputEl.value = '';
     renderList();
     resetConversationView('请重新输入要读取的文件夹路径。');
@@ -332,6 +425,16 @@ clearDirectoryBtnEl.addEventListener('click', async () => {
     setDirectoryStatus(`清空失败：${error.message}`, 'error');
   } finally {
     setDirectoryFormDisabled(false);
+  }
+});
+
+document.addEventListener('click', () => {
+  closeConversationMenu();
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    closeConversationMenu();
   }
 });
 

@@ -7,6 +7,7 @@ const PORT = process.env.PORT || 3000;
 const CONFIG_PATH = path.join(__dirname, 'data-directory.json');
 
 let currentDataDir = resolveDataDir(process.env.DATA_DIR) || null;
+let trashModulePromise = null;
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -31,6 +32,7 @@ async function readSavedConfig() {
     if (error.code === 'ENOENT') {
       return null;
     }
+
     throw error;
   }
 }
@@ -46,7 +48,7 @@ async function writeSavedConfig(dataDir) {
 async function assertReadableDirectory(dirPath) {
   const stats = await fs.stat(dirPath);
   if (!stats.isDirectory()) {
-    throw new Error('所填路径不是文件夹');
+    throw new Error('The configured path is not a directory');
   }
 
   await fs.readdir(dirPath);
@@ -58,6 +60,37 @@ function buildDirectoryState(errorMessage = null) {
     configured: Boolean(currentDataDir),
     error: errorMessage
   };
+}
+
+function resolveConversationPath(fileName) {
+  if (!currentDataDir) {
+    throw new Error('JSON data directory is not configured');
+  }
+
+  if (typeof fileName !== 'string' || !fileName.toLowerCase().endsWith('.json')) {
+    throw new Error('Only JSON files are supported');
+  }
+
+  const safeBaseDir = path.normalize(`${currentDataDir}${path.sep}`);
+  const safePath = path.normalize(path.join(currentDataDir, fileName));
+  if (!safePath.startsWith(safeBaseDir)) {
+    throw new Error('Invalid path');
+  }
+
+  return safePath;
+}
+
+async function loadTrash() {
+  if (!trashModulePromise) {
+    trashModulePromise = import('trash').then((module) => module.default);
+  }
+
+  return trashModulePromise;
+}
+
+async function moveFileToRecycleBin(filePath) {
+  const trash = await loadTrash();
+  await trash(filePath, { glob: false });
 }
 
 function getRole(node) {
@@ -101,6 +134,7 @@ function collectFirstDisplayable(rawId, mapping) {
   for (const childId of node.children || []) {
     result.push(...collectFirstDisplayable(childId, mapping));
   }
+
   return result;
 }
 
@@ -205,7 +239,7 @@ app.post('/api/data-directory', async (req, res) => {
     await writeSavedConfig(currentDataDir);
     res.json(buildDirectoryState());
   } catch (error) {
-    res.status(400).json({ error: '保存文件夹失败', detail: error.message });
+    res.status(400).json({ error: 'Failed to save data directory', detail: error.message });
   }
 });
 
@@ -221,10 +255,12 @@ app.get('/api/conversations', async (_req, res) => {
     const summaries = [];
     for (const file of jsonFiles) {
       const fullPath = path.join(currentDataDir, file);
+
       try {
         const raw = await fs.readFile(fullPath, 'utf8');
         const parsed = JSON.parse(raw);
         const lastMessageTime = getLastDisplayableMessageTime(parsed);
+
         summaries.push({
           id: file,
           title: parsed.title || file,
@@ -233,7 +269,7 @@ app.get('/api/conversations', async (_req, res) => {
           lastMessageTime
         });
       } catch {
-        // 忽略单个文件解析失败，继续处理其他文件。
+        // Ignore malformed files and keep scanning the rest.
       }
     }
 
@@ -242,35 +278,56 @@ app.get('/api/conversations', async (_req, res) => {
         (b.lastMessageTime || b.updateTime || b.createTime || 0) -
         (a.lastMessageTime || a.updateTime || a.createTime || 0)
     );
+
     res.json({ conversations: summaries, ...buildDirectoryState() });
   } catch (error) {
-    res.status(500).json({ error: '读取会话列表失败', detail: error.message });
+    res.status(500).json({ error: 'Failed to read conversations', detail: error.message });
   }
 });
 
 app.get('/api/conversations/:id', async (req, res) => {
-  if (!currentDataDir) {
-    return res.status(400).json({ error: '尚未配置 JSON 文件夹' });
-  }
+  let safePath;
 
-  const fileName = req.params.id;
-  if (!fileName.toLowerCase().endsWith('.json')) {
-    return res.status(400).json({ error: '仅支持 JSON 文件' });
-  }
-
-  const safeBaseDir = path.normalize(`${currentDataDir}${path.sep}`);
-  const safePath = path.normalize(path.join(currentDataDir, fileName));
-  if (!safePath.startsWith(safeBaseDir)) {
-    return res.status(400).json({ error: '非法路径' });
+  try {
+    safePath = resolveConversationPath(req.params.id);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
   }
 
   try {
     const raw = await fs.readFile(safePath, 'utf8');
     const parsed = JSON.parse(raw);
-    const normalized = normalizeConversation(parsed, fileName);
+    const normalized = normalizeConversation(parsed, req.params.id);
     res.json(normalized);
   } catch (error) {
-    res.status(500).json({ error: '读取会话失败', detail: error.message });
+    res.status(500).json({ error: 'Failed to read conversation', detail: error.message });
+  }
+});
+
+app.delete('/api/conversations/:id', async (req, res) => {
+  let safePath;
+
+  try {
+    safePath = resolveConversationPath(req.params.id);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  try {
+    await fs.access(safePath);
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return res.status(404).json({ error: 'Conversation file not found' });
+    }
+
+    return res.status(500).json({ error: 'Failed to access conversation file', detail: error.message });
+  }
+
+  try {
+    await moveFileToRecycleBin(safePath);
+    res.json({ ok: true, id: req.params.id });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete conversation', detail: error.message });
   }
 });
 
