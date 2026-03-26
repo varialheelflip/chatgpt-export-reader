@@ -139,6 +139,7 @@ body {
 }
 
 .directory-actions button {
+  flex: 1 1 0;
   padding: 0 12px;
   cursor: pointer;
   background: #fff;

@@ -14,7 +14,9 @@ const messageTpl = document.getElementById('message-template');
 const directoryFormEl = document.getElementById('directory-form');
 const directoryInputEl = document.getElementById('directory-input');
 const saveDirectoryBtnEl = document.getElementById('save-directory-btn');
+const importZipBtnEl = document.getElementById('import-zip-btn');
 const clearDirectoryBtnEl = document.getElementById('clear-directory-btn');
+const zipInputEl = document.getElementById('zip-input');
 const directoryStatusEl = document.getElementById('directory-status');
 const dialogOverlayEl = document.getElementById('dialog-overlay');
 const dialogTitleEl = document.getElementById('dialog-title');
@@ -89,7 +91,8 @@ function setDirectoryStatus(message, type = '') {
 function setDirectoryFormDisabled(disabled) {
   directoryInputEl.disabled = disabled;
   saveDirectoryBtnEl.disabled = disabled;
-  clearDirectoryBtnEl.disabled = disabled;
+  importZipBtnEl.disabled = disabled;
+  zipInputEl.disabled = disabled;
 }
 
 function resetConversationView(message) {
@@ -198,6 +201,43 @@ async function deleteConversation(convo) {
   } finally {
     state.deletingConversationId = null;
     renderList();
+  }
+}
+
+async function importZipFile(file) {
+  if (!file) return;
+
+  if (!state.dataDir) {
+    await alertDialog('请先配置 JSON 文件夹路径，再导入 ZIP。');
+    return;
+  }
+
+  setDirectoryFormDisabled(true);
+  setDirectoryStatus(`正在导入 ZIP：${file.name}...`);
+
+  try {
+    const res = await fetch('/api/import-zip', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/zip',
+        'X-File-Name': encodeURIComponent(file.name)
+      },
+      body: await file.arrayBuffer()
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.detail || data.error || '导入 ZIP 失败');
+    }
+
+    await fetchList();
+    setDirectoryStatus(`已导入 ${data.importedCount} 个 JSON 文件到 ${state.dataDir}`, 'success');
+  } catch (error) {
+    console.error(error);
+    setDirectoryStatus(`导入 ZIP 失败：${error.message}`, 'error');
+  } finally {
+    zipInputEl.value = '';
+    setDirectoryFormDisabled(false);
   }
 }
 
@@ -471,7 +511,7 @@ directoryFormEl.addEventListener('submit', async (event) => {
   }
 });
 
-clearDirectoryBtnEl.addEventListener('click', async () => {
+clearDirectoryBtnEl?.addEventListener('click', async () => {
   setDirectoryFormDisabled(true);
   setDirectoryStatus('正在清空已保存的文件夹路径...');
 
@@ -504,6 +544,20 @@ clearDirectoryBtnEl.addEventListener('click', async () => {
   } finally {
     setDirectoryFormDisabled(false);
   }
+});
+
+importZipBtnEl.addEventListener('click', async () => {
+  if (!state.dataDir) {
+    await alertDialog('请先保存 JSON 文件夹路径。');
+    return;
+  }
+
+  zipInputEl.click();
+});
+
+zipInputEl.addEventListener('change', async () => {
+  const [file] = zipInputEl.files || [];
+  await importZipFile(file);
 });
 
 document.addEventListener('click', () => {

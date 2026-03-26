@@ -16,7 +16,7 @@
             <span class="tooltip-trigger" tabindex="0" aria-label="路径说明">
               ?
               <span class="tooltip-bubble">
-                浏览器无法稳定拿到可持久化的系统目录路径，因此这里改为后端保存文件夹路径。
+                浏览器无法稳定拿到可持久化的系统目录路径，所以这里改为由服务端保存 JSON 文件夹路径。
               </span>
             </span>
           </label>
@@ -29,8 +29,9 @@
           />
           <div class="directory-actions">
             <button type="submit" id="save-directory-btn">保存并加载</button>
-            <button type="button" id="clear-directory-btn" class="secondary">清空</button>
+            <button type="button" id="import-zip-btn" class="secondary">导入 ZIP</button>
           </div>
+          <input id="zip-input" type="file" accept=".zip,application/zip" hidden />
           <div id="directory-status" class="directory-status"></div>
         </form>
         <div id="conversation-list" class="conversation-list"></div>

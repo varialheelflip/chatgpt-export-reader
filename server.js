@@ -1,6 +1,7 @@
 const express = require('express');
 const fs = require('fs/promises');
 const path = require('path');
+const AdmZip = require('adm-zip');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -62,6 +63,15 @@ function buildDirectoryState(errorMessage = null) {
   };
 }
 
+async function assertConfiguredDataDirectory() {
+  if (!currentDataDir) {
+    throw new Error('JSON data directory is not configured');
+  }
+
+  await assertReadableDirectory(currentDataDir);
+  return currentDataDir;
+}
+
 function resolveConversationPath(fileName) {
   if (!currentDataDir) {
     throw new Error('JSON data directory is not configured');
@@ -91,6 +101,71 @@ async function loadTrash() {
 async function moveFileToRecycleBin(filePath) {
   const trash = await loadTrash();
   await trash(filePath, { glob: false });
+}
+
+function getUploadedFileName(req) {
+  const raw = req.get('x-file-name');
+  if (typeof raw !== 'string' || !raw.trim()) {
+    return 'upload.zip';
+  }
+
+  try {
+    return path.basename(decodeURIComponent(raw.trim()));
+  } catch {
+    return path.basename(raw.trim());
+  }
+}
+
+function getZipRootJsonEntries(buffer) {
+  let zip;
+
+  try {
+    zip = new AdmZip(buffer);
+  } catch (error) {
+    throw new Error(`Failed to read ZIP file: ${error.message}`);
+  }
+
+  return zip.getEntries().filter((entry) => {
+    if (entry.isDirectory) {
+      return false;
+    }
+
+    const normalizedEntryName = entry.entryName.replace(/\\/g, '/');
+    if (!normalizedEntryName || normalizedEntryName.includes('../')) {
+      return false;
+    }
+
+    const segments = normalizedEntryName.split('/').filter(Boolean);
+    return segments.length === 1 && segments[0].toLowerCase().endsWith('.json');
+  });
+}
+
+async function importZipArchive(buffer, sourceFileName) {
+  await assertConfiguredDataDirectory();
+
+  if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
+    throw new Error('ZIP file is empty');
+  }
+
+  const jsonEntries = getZipRootJsonEntries(buffer);
+  if (jsonEntries.length === 0) {
+    throw new Error('No JSON files were found in the ZIP root directory');
+  }
+
+  const importedFiles = [];
+  for (const entry of jsonEntries) {
+    const fileName = path.basename(entry.entryName.replace(/\\/g, '/'));
+    const targetPath = resolveConversationPath(fileName);
+    const content = entry.getData();
+    await fs.writeFile(targetPath, content);
+    importedFiles.push(fileName);
+  }
+
+  return {
+    sourceFileName,
+    importedCount: importedFiles.length,
+    importedFiles
+  };
 }
 
 function getRole(node) {
@@ -242,6 +317,22 @@ app.post('/api/data-directory', async (req, res) => {
     res.status(400).json({ error: 'Failed to save data directory', detail: error.message });
   }
 });
+
+app.post(
+  '/api/import-zip',
+  express.raw({
+    type: ['application/zip', 'application/x-zip-compressed', 'application/octet-stream'],
+    limit: '512mb'
+  }),
+  async (req, res) => {
+    try {
+      const result = await importZipArchive(req.body, getUploadedFileName(req));
+      res.json({ ok: true, ...result, ...buildDirectoryState() });
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to import ZIP', detail: error.message });
+    }
+  }
+);
 
 app.get('/api/conversations', async (_req, res) => {
   if (!currentDataDir) {

@@ -8,6 +8,7 @@
   },
   "license": "MIT",
   "dependencies": {
+    "adm-zip": "^0.5.16",
     "express": "^4.19.2",
     "trash": "^10.1.1"
   }
