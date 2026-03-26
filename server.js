@@ -104,6 +104,27 @@ function collectFirstDisplayable(rawId, mapping) {
   return result;
 }
 
+function toTimestamp(value) {
+  const timestamp = Number(value);
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function getLastDisplayableMessageTime(data) {
+  const mapping = data?.mapping || {};
+  let lastTime = 0;
+
+  for (const rawNode of Object.values(mapping)) {
+    if (!isDisplayable(rawNode)) continue;
+
+    const nodeTime = toTimestamp(rawNode?.message?.create_time);
+    if (nodeTime > lastTime) {
+      lastTime = nodeTime;
+    }
+  }
+
+  return lastTime;
+}
+
 function normalizeConversation(data, fileName) {
   const mapping = data.mapping || {};
   const nodes = {};
@@ -203,18 +224,24 @@ app.get('/api/conversations', async (_req, res) => {
       try {
         const raw = await fs.readFile(fullPath, 'utf8');
         const parsed = JSON.parse(raw);
+        const lastMessageTime = getLastDisplayableMessageTime(parsed);
         summaries.push({
           id: file,
           title: parsed.title || file,
           createTime: parsed.create_time || null,
-          updateTime: parsed.update_time || null
+          updateTime: parsed.update_time || null,
+          lastMessageTime
         });
       } catch {
         // 忽略单个文件解析失败，继续处理其他文件。
       }
     }
 
-    summaries.sort((a, b) => (b.updateTime || 0) - (a.updateTime || 0));
+    summaries.sort(
+      (a, b) =>
+        (b.lastMessageTime || b.updateTime || b.createTime || 0) -
+        (a.lastMessageTime || a.updateTime || a.createTime || 0)
+    );
     res.json({ conversations: summaries, ...buildDirectoryState() });
   } catch (error) {
     res.status(500).json({ error: '读取会话列表失败', detail: error.message });
